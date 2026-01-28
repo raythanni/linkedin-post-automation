@@ -1,0 +1,32 @@
+// Get all input items
+  const items = $input.all();
+
+  // Find the item with image data and the item with folder data
+  let imageBase64 = null;
+  let filename = null;
+  let folderId = null;
+
+  for (const item of items) {
+    if (item.json.image_base64) {
+      imageBase64 = item.json.image_base64;
+      filename = item.json.image_filename;
+    }
+    if (item.json.id && item.json.name) {
+      folderId = item.json.id;
+    }
+  }
+
+  return [{
+    json: {
+      filename: filename,
+      image_filename: filename,
+      folder_id: folderId
+    },
+    binary: {
+      data: {
+        data: imageBase64,
+        mimeType: 'image/png',
+        fileName: filename
+      }
+    }
+  }];

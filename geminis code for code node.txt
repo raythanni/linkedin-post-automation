@@ -1,0 +1,18 @@
+// Pull data directly from the source nodes to ensure they are never null
+const folderId = $('Create folder').first().json.id;
+const filename = $('Generate Filename').first().json.image_filename;
+const imageBase64 = $('Format Response').first().json.image_base64;
+
+return [{
+    json: {
+        folder_id: folderId,
+        image_filename: filename
+    },
+    binary: {
+        data: { 
+            data: imageBase64,
+            mimeType: 'image/png',
+            fileName: filename
+        }
+    }
+}];

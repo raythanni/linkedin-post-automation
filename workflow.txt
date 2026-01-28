@@ -1,0 +1,129 @@
+ {
+    "name": "LinkedIn Post Image Generator",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "linkedin-image",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "webhook-trigger",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [250, 300]
+      },
+      {
+        "parameters": {
+          "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpQueryAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an expert at creating image prompts for LinkedIn post visuals.\\n\\nGiven this LinkedIn post, create a 
+  detailed image prompt for an engaging, professional visual that would accompany it. The image should be:\\n- Clean and professional\\n- Suitable for LinkedIn\\n- Eye-catching but not 
+  cluttered\\n- Abstract or conceptual (avoid showing specific people)\\n\\nLinkedIn Post:\\n{{ $json.body.post_content }}\\n\\nRespond with ONLY the image prompt, nothing else. Keep it under 200 
+  words.\"\n    }]\n  }]\n}",
+          "options": {}
+        },
+        "id": "gemini-prompt",
+        "name": "Gemini - Create Image Prompt",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [450, 300],
+        "credentials": {
+          "httpQueryAuth": {
+            "id": "GEMINI_CREDENTIAL_ID",
+            "name": "Gemini API Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const response = $input.first().json;\nconst imagePrompt = response.candidates[0].content.parts[0].text;\nreturn [{ json: { image_prompt: imagePrompt, original_post: 
+  $('Webhook').first().json.body.post_content, filename: $('Webhook').first().json.body.filename } }];"
+        },
+        "id": "extract-prompt",
+        "name": "Extract Image Prompt",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [650, 300]
+      },
+      {
+        "parameters": {
+          "url": "https://api.ideogram.ai/generate",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"image_request\": {\n    \"prompt\": \"{{ $json.image_prompt }}\",\n    \"aspect_ratio\": \"ASPECT_1_1\",\n    \"model\": \"V_2\",\n    \"magic_prompt_option\": 
+  \"AUTO\"\n  }\n}",
+          "options": {}
+        },
+        "id": "ideogram-generate",
+        "name": "Ideogram - Generate Image",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [850, 300],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "IDEOGRAM_CREDENTIAL_ID",
+            "name": "Ideogram API Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const ideogramResponse = $input.first().json;\nconst imageUrl = ideogramResponse.data[0].url;\nconst previousData = $('Extract Image Prompt').first().json;\n\nreturn [{\n  
+  json: {\n    success: true,\n    image_url: imageUrl,\n    image_prompt: previousData.image_prompt,\n    filename: previousData.filename\n  }\n}];"
+        },
+        "id": "format-response",
+        "name": "Format Response",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [1050, 300]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}"
+        },
+        "id": "respond-webhook",
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [1250, 300]
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [{ "node": "Gemini - Create Image Prompt", "type": "main", "index": 0 }]
+        ]
+      },
+      "Gemini - Create Image Prompt": {
+        "main": [
+          [{ "node": "Extract Image Prompt", "type": "main", "index": 0 }]
+        ]
+      },
+      "Extract Image Prompt": {
+        "main": [
+          [{ "node": "Ideogram - Generate Image", "type": "main", "index": 0 }]
+        ]
+      },
+      "Ideogram - Generate Image": {
+        "main": [
+          [{ "node": "Format Response", "type": "main", "index": 0 }]
+        ]
+      },
+      "Format Response": {
+        "main": [
+          [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    }
+  }

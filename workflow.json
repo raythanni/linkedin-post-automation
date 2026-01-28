@@ -1,0 +1,123 @@
+{
+  "name": "LinkedIn Post Image Generator (Gemini)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "linkedin-image",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You create image prompts for LinkedIn post visuals.\\n\\nGiven this LinkedIn post, create a detailed image prompt. The image should be:\\n- Professional and clean\\n- Suitable for LinkedIn\\n- Abstract or conceptual (no specific people)\\n- Eye-catching with modern design\\n\\nPost:\\n{{ $json.body.post_content }}\\n\\nRespond with ONLY the image prompt. Under 150 words.\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "id": "gemini-prompt",
+      "name": "Gemini - Create Image Prompt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "GEMINI_CREDENTIAL_ID",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst imagePrompt = response.candidates[0].content.parts[0].text;\nreturn [{ json: { image_prompt: imagePrompt, filename: $('Webhook').first().json.body.filename } }];"
+      },
+      "id": "extract-prompt",
+      "name": "Extract Image Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"{{ $json.image_prompt }}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"responseModalities\": [\"TEXT\", \"IMAGE\"]\n  }\n}",
+        "options": {}
+      },
+      "id": "gemini-image",
+      "name": "Gemini - Generate Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "GEMINI_CREDENTIAL_ID",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst parts = response.candidates[0].content.parts;\nlet imageData = null;\nlet textResponse = null;\n\nfor (const part of parts) {\n  if (part.inlineData) {\n    imageData = part.inlineData.data;\n  }\n  if (part.text) {\n    textResponse = part.text;\n  }\n}\n\nconst previousData = $('Extract Image Prompt').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    image_base64: imageData,\n    image_prompt: previousData.image_prompt,\n    filename: previousData.filename\n  }\n}];"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Gemini - Create Image Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gemini - Create Image Prompt": {
+      "main": [
+        [{ "node": "Extract Image Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Image Prompt": {
+      "main": [
+        [{ "node": "Gemini - Generate Image", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gemini - Generate Image": {
+      "main": [
+        [{ "node": "Format Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

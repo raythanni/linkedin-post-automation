@@ -26,7 +26,7 @@ An AI-powered system that generates viral LinkedIn posts and accompanying images
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Claude Code    │────▶│   n8n Webhook   │────▶│  Google Drive   │
+│  LLM            │────▶│   n8n Webhook   │────▶│  Google Drive   │
 │  (Post Gen)     │     │  (Image Gen)    │     │  (Storage)      │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
                                │
@@ -39,12 +39,11 @@ An AI-powered system that generates viral LinkedIn posts and accompanying images
 
 ## Components
 
-### 1. Post Generation (Claude Code)
+### 1. Post Generation (CURSOR/ANTIGRAVITY/CLAUDE or any LLM)
 
 Generates posts using a training reference of successful LinkedIn creators:
-- **Lara Acosta** - Hook patterns (POV, confession, contrarian)
-- **Lenny Rachitsky** - Insight-driven, tactical depth
-- **Steven Bartlett** - Bold predictions, emotional resonance
+- **L Acosta** - Hook patterns (POV, confession, contrarian)
+- **S Bartlett** - Bold predictions, emotional resonance
 
 ### 2. AI Evaluation
 
@@ -75,7 +74,7 @@ An n8n workflow that:
 
 ### Prerequisites
 
-- [Claude Code](https://claude.ai/claude-code) CLI
+- [Claude Code OR Any other LLM - deepseek, Gemini ) CLI
 - [n8n](https://n8n.io/) (self-hosted or cloud)
 - Google Cloud project with:
   - Gemini API enabled

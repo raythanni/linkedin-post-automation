@@ -1,5 +1,5 @@
 {
-  "name": "LinkedIn Post Image Generator (Gemini)",
+  "name": "LinkedIn Post Image Generator",
   "nodes": [
     {
       "parameters": {
@@ -12,26 +12,34 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [250, 300]
+      "position": [-64, 0],
+      "webhookId": "YOUR_WEBHOOK_ID"
     },
     {
       "parameters": {
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpQueryAuth",
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You create image prompts for LinkedIn post visuals.\\n\\nGiven this LinkedIn post, create a detailed image prompt. The image should be:\\n- Professional and clean\\n- Suitable for LinkedIn\\n- Abstract or conceptual (no specific people)\\n- Eye-catching with modern design\\n\\nPost:\\n{{ $json.body.post_content }}\\n\\nRespond with ONLY the image prompt. Under 150 words.\"\n    }]\n  }]\n}",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contents[0].parts[0].text",
+              "value": "=You are an expert at creating image prompts for LinkedIn post thumbnails.\n\n  Based on this LinkedIn post:\n  {{ $json.body.post_content }}\n\n  Create a single image prompt (one paragraph, under 80 words) that:\n  - Features a CONCRETE visual metaphor (not abstract concepts)\n  - Works as a professional LinkedIn thumbnail\n  - Uses bold, simple imagery that reads well at small sizes\n  - Style: Modern flat illustration OR cinematic photography\n  - Colors: High contrast, bold primary colors\n  - Avoid: Text in image, cliché business imagery (handshakes, lightbulbs, puzzle pieces, gears), abstract shapes, multiple competing elements\n\n  Return ONLY the image prompt. No JSON. No explanation. Just the prompt."
+            }
+          ]
+        },
         "options": {}
       },
       "id": "gemini-prompt",
       "name": "Gemini - Create Image Prompt",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [450, 300],
+      "position": [96, 192],
       "credentials": {
         "httpQueryAuth": {
-          "id": "GEMINI_CREDENTIAL_ID",
+          "id": "YOUR_GEMINI_CREDENTIAL_ID",
           "name": "Gemini API Key"
         }
       }
@@ -44,26 +52,27 @@
       "name": "Extract Image Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [650, 300]
+      "position": [320, -176]
     },
     {
       "parameters": {
+        "method": "POST",
         "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpQueryAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"{{ $json.image_prompt }}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"responseModalities\": [\"TEXT\", \"IMAGE\"]\n  }\n}",
+        "jsonBody": "={\n    \"contents\": [\n      {\n        \"parts\": [\n          {\n            \"text\": {{ JSON.stringify(\"Generate an image: \" + $json.image_prompt) }}\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"responseModalities\": [\"TEXT\", \"IMAGE\"]\n    }\n  }",
         "options": {}
       },
       "id": "gemini-image",
       "name": "Gemini - Generate Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [850, 300],
+      "position": [624, -80],
       "credentials": {
         "httpQueryAuth": {
-          "id": "GEMINI_CREDENTIAL_ID",
+          "id": "YOUR_GEMINI_CREDENTIAL_ID",
           "name": "Gemini API Key"
         }
       }
@@ -76,47 +85,296 @@
       "name": "Format Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1050, 300]
+      "position": [816, 160]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ $json }}"
+        "responseBody": "={{ $json }}",
+        "options": {}
       },
       "id": "respond-webhook",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1250, 300]
+      "position": [1680, -144]
+    },
+    {
+      "parameters": {
+        "jsCode": "  const now = new Date();\n  const day = String(now.getDate()).padStart(2, '0');\n  const month = String(now.getMonth() + 1).padStart(2, '0');\n  const year = now.getFullYear();\n  const dateStr = `${day}${month}${year}`;\n\n  const previousData = $input.first().json;\n  const baseFilename = $('Webhook').first().json.body.filename || 'linkedin-post';\n  const postContent = $('Webhook').first().json.body.post_content || '';\n\n  const articleNumber = '01';\n\n  const folderName = `${baseFilename}-${articleNumber}-${dateStr}`;\n  const textFilename = `${baseFilename}-${articleNumber}-${dateStr}.md`;\n  const imageFilename = `${baseFilename}-${articleNumber}-${dateStr}-image.png`;\n\n  return [{\n    json: {\n      ...previousData,\n      folder_name: folderName,\n      text_filename: textFilename,\n      image_filename: imageFilename,\n      post_content: postContent\n    }\n  }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, -32],
+      "id": "generate-filename",
+      "name": "Generate Filename"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $json.folder_name }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_DRIVE_FOLDER_URL",
+          "mode": "url"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1168, -16],
+      "id": "create-folder",
+      "name": "Create folder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "post_content",
+        "options": {
+          "fileName": "={{ $json.text_filename }}"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [1136, 368],
+      "id": "convert-to-text",
+      "name": "Convert md to txt File"
+    },
+    {
+      "parameters": {
+        "name": "={{ $json.image_filename }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.folder_id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1488, -240],
+      "id": "upload-image",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [1344, 288],
+      "id": "merge-node",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "=data",
+        "name": "={{ $('Generate Filename').item.json.text_filename }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1520, 208],
+      "id": "upload-text",
+      "name": "save text to drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pull data directly from the source nodes to ensure they are never null\nconst folderId = $('Create folder').first().json.id;\nconst filename = $('Generate Filename').first().json.image_filename;\nconst imageBase64 = $('Format Response').first().json.image_base64;\n\nreturn [{\n    json: {\n        folder_id: folderId,\n        image_filename: filename\n    },\n    binary: {\n        data: { \n            data: imageBase64,\n            mimeType: 'image/png',\n            fileName: filename\n        }\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1328, -240],
+      "id": "convert-binary",
+      "name": "Code - converts binary to image"
     }
   ],
+  "pinData": {},
   "connections": {
     "Webhook": {
       "main": [
-        [{ "node": "Gemini - Create Image Prompt", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Gemini - Create Image Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Gemini - Create Image Prompt": {
       "main": [
-        [{ "node": "Extract Image Prompt", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Extract Image Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Extract Image Prompt": {
       "main": [
-        [{ "node": "Gemini - Generate Image", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Gemini - Generate Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Gemini - Generate Image": {
       "main": [
-        [{ "node": "Format Response", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Format Response": {
       "main": [
-        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Generate Filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Filename": {
+      "main": [
+        [
+          {
+            "node": "Convert md to txt File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create folder": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code - converts binary to image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert md to txt File": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "save text to drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save text to drive": {
+      "main": [
+        []
+      ]
+    },
+    "Code - converts binary to image": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1"
   }

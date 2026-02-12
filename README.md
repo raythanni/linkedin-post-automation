@@ -39,7 +39,7 @@ An AI-powered system that generates viral LinkedIn posts and accompanying images
 
 ## Components
 
-### 1. Post Generation (CURSOR/ANTIGRAVITY/CLAUDE or any LLM)
+### 1. Post Generation (Any LLM)
 
 Generates posts using a training reference of successful LinkedIn creators:
 - **L Acosta** - Hook patterns (POV, confession, contrarian)
@@ -70,60 +70,104 @@ An n8n workflow that:
 3. Generates an image using Gemini 2.0 Flash
 4. Uploads both post and image to Google Drive
 
+## Example Posts
+
+See the [examples/](examples/) folder for generated posts:
+
+| Post | Topic | Pillar |
+|------|-------|--------|
+| [OpenAI Kills Safety Team](examples/openai-kills-safety-team-2025-02-12.md) | OpenAI disbanding alignment team - PM implications | Product Management |
+| [Safety First Leadership](examples/safety-first-leadership-warning-signs-2025-02-12.md) | Warning signs when companies sacrifice values for speed | Leadership |
+| [Prioritization Frameworks](examples/prioritization-frameworks-theater-2025-02-12.md) | Why most prioritization is theater | Product Management |
+
 ## Setup
 
 ### Prerequisites
 
-- [Claude Code OR Any other LLM - deepseek, Gemini ) CLI
 - [n8n](https://n8n.io/) (self-hosted or cloud)
-- Google Cloud project with:
-  - Gemini API enabled
-  - Google Drive API enabled
-- Google Drive OAuth credentials in n8n
+- Google Cloud project with Gemini API enabled
+- Google Drive account
 
-### Configuration
+### Step 1: Get a Gemini API Key
 
-1. **Clone this repo**
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
+2. Click **Create API Key**
+3. Copy and save your API key
+
+### Step 2: Import the n8n Workflow
+
+1. Open your n8n instance
+2. Click **Add workflow** → **Import from file**
+3. Select `workflow.json` from this repo
+4. The workflow will appear with placeholder credentials
+
+### Step 3: Configure Gemini Credentials in n8n
+
+1. In n8n, go to **Settings** → **Credentials** → **Add Credential**
+2. Search for **HTTP Query Auth**
+3. Configure:
+   - **Name:** `Gemini API Key`
+   - **Parameter Name:** `key`
+   - **Parameter Value:** `your-gemini-api-key-here`
+4. Save the credential
+5. Open the workflow and update these nodes to use your credential:
+   - `Gemini - Create Image Prompt`
+   - `Gemini - Generate Image`
+
+### Step 4: Configure Google Drive Credentials
+
+1. In n8n, go to **Settings** → **Credentials** → **Add Credential**
+2. Search for **Google Drive OAuth2 API**
+3. Follow the OAuth flow to connect your Google account
+4. Save the credential
+5. Update these nodes to use your credential:
+   - `Create folder`
+   - `Upload file`
+   - `save text to drive`
+
+### Step 5: Set Your Google Drive Folder
+
+1. In Google Drive, create a folder where posts will be saved (e.g., `LinkedIn Posts`)
+2. Copy the folder URL (e.g., `https://drive.google.com/drive/folders/abc123...`)
+3. In n8n, open the `Create folder` node
+4. Update the **Parent Folder** field with your folder URL
+
+### Step 6: Activate the Workflow
+
+1. Toggle the workflow to **Active**
+2. Copy your webhook URL (shown in the Webhook node)
+3. Test with:
    ```bash
-   git clone https://github.com/raythanni/linkedin-post-automation.git
-   cd linkedin-post-automation
+   curl -X POST "https://your-n8n-domain/webhook/linkedin-image" \
+     -H "Content-Type: application/json" \
+     -d '{"post_content": "Test post content", "filename": "test-post"}'
    ```
 
-2. **Import the n8n workflow**
-   - Open n8n
-   - Import `workflow.json`
-   - Update the webhook URL in your environment
-   - Add your Gemini API key credentials
+## Workflow Nodes Explained
 
-3. **Configure webhook URL**
-
-   Replace `YOUR_N8N_DOMAIN` in the workflow with your actual n8n domain:
-   ```
-   https://YOUR_N8N_DOMAIN/webhook/linkedin-image
-   ```
-
-4. **Set up Google Drive**
-   - Create a folder structure: `My Drive/06 AI/Linked Posts PM AI/`
-   - Connect Google Drive OAuth in n8n
+| Node | Purpose |
+|------|---------|
+| **Webhook** | Receives POST request with post content |
+| **Gemini - Create Image Prompt** | Generates an image description from the post |
+| **Extract Image Prompt** | Parses Gemini's response |
+| **Gemini - Generate Image** | Creates the actual image |
+| **Format Response** | Extracts base64 image data |
+| **Generate Filename** | Creates consistent filename pattern |
+| **Create folder** | Makes a new folder in Google Drive |
+| **Convert md to txt File** | Packages post as uploadable file |
+| **Code - converts binary to image** | Converts base64 to PNG |
+| **Merge1** | Synchronizes parallel file processing |
+| **save text to drive** | Uploads the post file |
+| **Upload file** | Uploads the image file |
+| **Respond to Webhook** | Returns response to caller |
 
 ## Usage
 
-### Generate a post
+### Generate an Image for Your Post
 
-1. Find a trending topic from news sources like:
-   - [International Intrigue](https://internationalintrigue.io/)
-   - [ts2.tech](https://ts2.tech/)
-
-2. Provide:
-   - **Topic/URL** - The news item or trend
-   - **Stance** - Supportive, critical, or balanced
-   - **Lens** - Prediction, observation, or personal story
-   - **Perspective** - Professional, parent, citizen
-   - **Key takeaway** - One thing readers should remember
-
-3. Review the generated post and AI evaluation score
-
-4. Approve to save and trigger image generation
+1. Write your LinkedIn post
+2. Call the webhook with curl (see below)
+3. The workflow generates an image and saves both to Google Drive
 
 ### Webhook API
 
@@ -132,7 +176,7 @@ An n8n workflow that:
 **Payload:**
 ```json
 {
-  "post_content": "your post text here",
+  "post_content": "your full post text here",
   "filename": "descriptive-filename"
 }
 ```
@@ -143,8 +187,8 @@ An n8n workflow that:
   "success": true,
   "image_base64": "...",
   "image_prompt": "A modern digital illustration...",
-  "text_filename": "topic-name-01-27012026",
-  "image_filename": "topic-name-01-27012026-image",
+  "text_filename": "topic-name-01-27012026.md",
+  "image_filename": "topic-name-01-27012026-image.png",
   "folder_name": "topic-name-01-27012026"
 }
 ```
@@ -154,21 +198,22 @@ An n8n workflow that:
 ```
 linkedin-post-automation/
 ├── README.md                 # This file
-├── training-reference.md     # Viral post examples & patterns
 ├── workflow.json             # n8n workflow (import this)
-├── workflow.txt              # Workflow documentation
-└── *.md                      # Generated posts
+├── training-reference.md     # Viral post examples & patterns
+├── examples/                 # Example generated posts
+│   ├── openai-kills-safety-team-2025-02-12.md
+│   ├── safety-first-leadership-warning-signs-2025-02-12.md
+│   └── prioritization-frameworks-theater-2025-02-12.md
+└── images/                   # Screenshots for README
 ```
 
 ### Google Drive Output
 
 ```
-My Drive/
-└── 06 AI/
-    └── Linked Posts PM AI/
-        └── {topic}-{number}-{ddmmyyyy}/
-            ├── {topic}-{number}-{ddmmyyyy}.md
-            └── {topic}-{number}-{ddmmyyyy}-image.png
+Your Drive Folder/
+└── {topic}-{number}-{ddmmyyyy}/
+    ├── {topic}-{number}-{ddmmyyyy}.md
+    └── {topic}-{number}-{ddmmyyyy}-image.png
 ```
 
 ## Post Structure
@@ -186,11 +231,22 @@ Every generated post follows this framework:
 
 | Component | Technology |
 |-----------|------------|
-| Post Generation | Claude (via Claude Code) |
-| Image Generation | Google Gemini 2.0 Flash |
-| Workflow Automation | n8n (self-hosted) |
-| File Storage | Google Drive API |
+| Post Generation | Any LLM |
 | Image Prompt Generation | Google Gemini 2.0 Flash |
+| Image Generation | Google Gemini 2.0 Flash (experimental) |
+| Workflow Automation | n8n (self-hosted or cloud) |
+| File Storage | Google Drive API |
+
+## Troubleshooting
+
+### "Model not found" error
+Make sure you're using `gemini-2.0-flash-exp-image-generation` for image generation. Regular `gemini-2.0-flash` doesn't support image output.
+
+### Images not uploading
+Check that your Google Drive OAuth credential has write permissions and the folder URL is correct.
+
+### Webhook timeout
+Image generation can take 30-60 seconds. Increase your webhook timeout if needed.
 
 ## Roadmap
 
